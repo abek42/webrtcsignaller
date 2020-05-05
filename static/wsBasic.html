@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+	<script src="wsBasic.js"></script>
+    <script>
+		//first two calls
+		setDOMUpdateListener();
+		
+        function setDebugDiv(){
+            //$("reload").html(JSON.stringify(Date()).split("+")[0]);
+            document.getElementById("reload").innerHTML = JSON.stringify(Date()).split("+")[0];
+        }
+		
+		function setDOMUpdateListener(){//this is meant to encapsulate DOM changes in response to non-DOM events
+			document.addEventListener("DOMUpdate", function(e) {
+				processDOMUpdate(e.detail);//this function should be updated to work on customized changes
+			});
+		}
+		
+		function processDOMUpdate(eventDetails){	
+			//normally, we assume that there is a single span with the name to which the update lands in
+			var hnd = document.getElementById(eventDetails.name);
+			console.log(eventDetails,hnd);
+			if(typeof(hnd)==="undefined"||hnd==null){//doesn't exist
+				hnd = document.createElement('span'); 				//create a span
+				hnd.id = eventDetails.name;							//set it's id for future use
+				document.getElementById("debug").appendChild(hnd); 	//add the new span to the debug-div
+				console.log(eventDetails,hnd);
+			}
+			switch(eventDetails.name){
+				case WSSTATUS:
+					hnd.innerHTML = eventDetails.details.stat;					//add the actual message
+					break;
+				case WSEVENT:
+					hnd.innerHTML = eventDetails.details.evt;
+					break;
+				default:
+					hnd.innerHTML = eventDetails.details;
+					console.log("TBD: ",eventDetails.name, eventDetails);
+			}
+			
+			
+			
+		}
+		
+		
+    </script>
+</head>
+<body onload="setDebugDiv();">
+<div id="debug">
+	<input type="button" onclick="location.reload();" value="Reload"/>
+	<span id="reload">ERROR</span><br>
+	Status: <span id="wsStatus"></span><br>
+	Event: <span id="wsEvent"></span>
+	<input type="button" onclick="wsSend('test')" value="Send" id="next">
+</div>
+<script>
+	console.log("wsinit");
+			websocketInit({});
+</script>
+</body>
+</html>

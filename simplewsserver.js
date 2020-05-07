@@ -7,8 +7,22 @@ const util= require('util');
 const os = require('os');
 const path = require('path');
 
-var wsStatus = {port:1337, externalIP:true, noHTTP:false, httpPort:3000 ,browserClients:[],  serverIP:[]};
+const CLIENT_UNKNOWN="unknown client type";
+const CLIENT_IS_ALICE ="alice";
+const CLIENT_IS_EVE = "eve";
 
+const ACTION_WS_FAILED="Action WS failed";
+const ACTION_WR_FAILED="Action WR failed";
+const ACTION_INIT_WRCONN = "Init WR Connection";
+const ACTION_WS_CONNECT="WS INIT CONN";
+const ACTION_WS_CLIENT_SET="Client set";
+const ACTION_WRCONN_NEXT = "Next step of WR connection";
+
+const ERR_ALICE_UNAVAILABLE="Alice is not connected";
+
+
+let wsStatus = {port:1337, externalIP:true, noHTTP:false, httpPort:3000 ,browserClients:[],  serverIP:[]};
+ 
 runServer();
 
 function runServer(){
@@ -44,42 +58,143 @@ function wsInit(){//this is the websocket part which allows data from the LSL In
 
 	wsServer.on('request', function(request) {
 	   //we only allow local connections, default choice
+	    let connection=null;
 		if(isAllowedIP(request.remoteAddress)){//set wsStatus.externalIP = true when a second device is expected to connect
 			console.log("INFO: Incoming WS connection from: " +request.remoteAddress);
 		}        
 		else{
 			console.log("ERR: Rejecting WS connection request from remote client:"+request.remoteAddress);
-			var connection = request.reject(102, 'Remote Connection Request Denied. Server only allows local-machine IPs');
+			connection = request.reject(102, 'Remote Connection Request Denied. Server only allows local-machine IPs');
 			return;
 		}
 	   
-		var connection = request.accept(null, request.origin);// create the connection
+		connection = request.accept(null, request.origin);// create the connection
 		
-		var index =wsStatus.browserClients.push(connection)-1; //save it for later use
+		let client = {"connection":connection, "ip":request.remoteAddress,"type":CLIENT_UNKNOWN};
+		
+		wsStatus.browserClients.push(client); //save it for later use
 		
 		// all messages from users are handled here
 		connection.on('message', function(message) {
 			if (message.type === 'utf8') {
 				// process WebSocket message
-				console.log("INFO: WS Client Message>", message.utf8Data);
-				process(message);
+				console.log("INFO: WS Client Message> from:",client.ip, client.type, message.utf8Data.length);
+				process(message.utf8Data,client);
 			}
 		});
 
 		connection.on('close', function(connection) {
 			// close user connection
-			var client = (typeof(wsStatus.browserClients[index])!=="undefined")? wsStatus.browserClients[index].remoteAddress:"";
-			console.log("WARN: Client: "+ client + " on WS "+connection.toString() + " disconnected");
-			wsStatus.browserClients.splice(index, 1);
+			console.log("DBG: Close",client.ip);
+			let clientIdx = wsStatus.browserClients.findIndex(bc=>bc.ip==client.ip);
+			console.log("WARN: Client: "+ client.ip + " on WS "+connection.toString() + " disconnected");
+			wsStatus.browserClients.splice(clientIdx, 1);
 		});
 	});
 }
 
 
-function process(msg){
-	console.log("TBD:process: ",msg);	
+function process(msg,client){
+	console.log("TBD:process: msg from:",client.ip);
+	try{
+		let obj = JSON.parse(msg);
+		console.log("DBG: process>","parsed", obj.action);
+		switch(obj.action){
+			case ACTION_WS_CONNECT:
+				setClientType(obj.type,client);
+				break;
+			case ACTION_INIT_WRCONN:
+				processWRRequest(obj,client);
+				break;
+			case ACTION_WRCONN_NEXT:
+				processWRNext(obj,client);
+				break;
+			default:
+				console.log("Unknown action", obj.action);
+			
+		}
+	}
+	catch(e){
+		sendErrMsg(client.connection,"JSON Parse error",e.toString());
+	}
 }
 
+function processWRNext(obj,client){
+	//**Dory forwards response to Eve based on forIP
+	console.log("DBG: processWRNext",client.ip,client.type,obj);
+	if(client.type==CLIENT_IS_ALICE&&obj.data.response){
+		let eve = wsStatus.browserClients.find(bc=>bc.type==CLIENT_IS_EVE&&bc.ip==obj.data.response.forIP);
+		console.log("DBG: processWRNext> to: eve",eve.ip, obj.data.response.status);
+		sendMsg(eve.connection,obj.action,{response:obj.data.response});
+	}
+	if(client.type==CLIENT_IS_EVE&&obj.data.request){
+		let alice = wsStatus.browserClients.find(bc=>bc.type==CLIENT_IS_ALICE);
+		console.log("DBG: processWRNext> to: alice",alice.ip, obj.data.request.status);
+		obj.data.request.fromIP=client.ip;
+		sendMsg(alice.connection,obj.action,{request:obj.data.request});
+	}
+}
+
+function processWRRequest(obj,client){
+	/*Dory checks if Alice is connected
+		If Alice is not connected
+			Send Eve {action:ACTION_WR_FAILED,data:{status:OFFER_FAILED,reason:ALICE_NOT_ONLINE}}
+		If Alice is connected
+			Dory inserts fromIP value into the request
+			Dory forwards request to Alice*/
+	let alice = wsStatus.browserClients.find(bc=>bc.type==CLIENT_IS_ALICE);
+	if(typeof(alice)==="undefined"){
+		sendErrMsg(client.connection,"Alice is not connected",ERR_ALICE_UNAVAILABLE,ACTION_WR_FAILED);
+	}
+	else{
+		obj.data.request.fromIP=client.ip;
+		sendMsg(alice.connection,obj.action,{request:obj.data.request});
+	}
+	
+}
+
+function setClientType(type,client){
+	console.log("DBG: setClientType","to: ",type,"from: ",client.type);
+	if(client.type==CLIENT_UNKNOWN){//only once should this happen, attempt to redo should be rejected
+		//console.log("DBG: setClientType","chk",client.type,allowClient(type));
+		if(allowClient(type)){
+			client.type=type;
+			//console.log("DBG: setClientType","set",client.type);
+			sendMsg(client.connection,ACTION_WS_CLIENT_SET,{"state":"set",to:client.type});
+		}
+		else{
+			console.log("DBG: disallowed",type);
+			sendErrMsg(client.connection,"Client Type is disallowed: "+type,"Invalid Client Type");
+		}
+	}
+	else{
+		//console.log("DBG: setClientType","buh",client.type);
+		sendErrMsg(client.connection,"Connection cannot be reinitialized","Connection Reinit");
+	}
+}
+
+function allowClient(type){
+	let response=false;
+	switch(type){
+		case CLIENT_IS_EVE:
+			response=true;
+			break;
+		case CLIENT_IS_ALICE:
+			if(wsStatus.browserClients.findIndex(bc=>bc.type==CLIENT_IS_ALICE)<0) response=true;
+			break;
+	}
+	return response;
+}
+
+function sendMsg(conn,action,msg){
+	console.log("DBG: msg sent",msg);
+	conn.sendUTF(JSON.stringify({"action":action,data:msg}));
+}
+
+function sendErrMsg(conn,msg,error,action=ACTION_WS_FAILED){
+	console.log("DBG: err msg sent",msg,error);
+	conn.sendUTF(JSON.stringify({"action":action,data:{"status":"ERROR","msg":msg,"error":error}}));
+}
 
 //acquire the IP address of the server 
 function getIP(ip){

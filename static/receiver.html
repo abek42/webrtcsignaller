@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+	<title>Receiver</title>
+    <script src="wsBasic.js"></script>
+	<script src="webRTC.js" ></script>
+	<script src="common.js" ></script>
+	<script src="receiver.js" ></script>
+    <script>
+		
+		
+    </script>
+</head>
+<body onload="setDebugDiv();">
+<div id="debug">
+	<input type="button" onclick="location.reload();" value="Reload"/>
+	<span id="reload">ERROR</span><br>
+	Status: <span id="wsStatus"></span><br>
+	Event: <span id="wsEvent"></span><br>
+	<input type="button" value="Init WS" id="setIP" onclick="setWSIP();"/><br>
+	<input type="button" onclick="wsSend('test')" value="Connect" id="next"/>
+</div>
+<script>
+</script>
+</body>
+</html>

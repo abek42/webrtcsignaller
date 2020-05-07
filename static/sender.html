@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sender</title>
+	<script src="wsBasic.js"></script>
+	<script src="webRTC.js" ></script>
+	<script src="common.js" ></script>
+	<script src="sender.js" ></script>
+    <script>
+		
+		
+		
+    </script>
+</head>
+<body onload="setDebugDiv();">
+<div id="debug">
+	<input type="button" onclick="location.reload();" value="Reload"/>
+	<span id="reload">ERROR</span><br>
+	Status: <span id="wsStatus"></span><br>
+	Event: <span id="wsEvent"></span>
+	<input type="button" onclick="wsSend('test')" value="Send" id="next">
+</div>
+<script>
+	console.log("wsinit");
+	websocketInit({clientType:CLIENT_IS_ALICE});
+</script>
+</body>
+</html>

@@ -29,6 +29,95 @@ function processRequest(msg){
 	
 }
 
+function notifyDC(evt,details,name){
+	switch(evt){
+		case DC_OPEN:
+			//when this opens, we need to start processing video
+			upgradeToVideo(details);
+			break;
+		case DC_CLOSE:
+		
+			break;
+		case DC_MSG:
+			console.log("TBD: notifyDC",DC_MSG,"of length",details.data.length,name);
+			finalizeVideo(details,name);
+			break;
+	}
+	
+}
+
+function finalizeVideo(details,dcName){
+	let client = getClient(dcName+"-out");
+	let parsed=isActionMsg(details);
+	console.log("DBG: finalizeVideo>",parsed);
+	if(parsed){
+		let remoteSDP = new RTCSessionDescription(parsed.data.response.sdp);
+		client.videoPC.setRemoteDescription(remoteSDP)
+		.then(function() {
+			console.log("TBD exchange ICE");
+			//callerObj.exchangeICE=true;
+			//exchangeICE(callerObj,callerObj.chName);
+		})
+		.catch(function(reason) {
+			// An error occurred, so handle the failure to connect
+			console.log(reason);
+		});
+	}
+}
+
+function getClient(name){
+	console.log("TBD: getClient",clients,name);
+	let client;
+	clients.forEach(cl=>{
+		cl.connObjs.forEach(co=>{
+			if(co.chName+"-out"==name) client=cl;			
+		});
+	});
+	//let client = clients.find(cl=>{return typeof(cl.connObjs.find(co=>co.chName+"-out"==name))==="undefined";});
+	return client;
+}
+
+function upgradeToVideo(dc){
+	let client = getClient(dc.label);
+	navigator.mediaDevices.getUserMedia(mediaConstraints)
+    .then(function(localStream) {
+      document.getElementById("local_video").srcObject = localStream;
+	  hndVideo.localStream=localStream;
+	  hndVideo.errLocal=false;
+     // localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+    })
+	.then(function(){
+		let videoPC = new RTCPeerConnection();
+		client.videoPC=videoPC;
+		for (const track of hndVideo.localStream.getTracks()) {
+			videoPC.addTrack(track);
+		}
+		videoPC.createOffer()
+			.then(function(offer) {
+				return videoPC.setLocalDescription(offer);
+			})
+			.then(function() {
+				dc.send(JSON.stringify({action:ACTION_WR_VID_INIT,
+									data:{
+											response:{
+											  type: "video-offer",
+											  sdp: videoPC.localDescription
+											}
+									}
+								  }));
+			})
+			.catch(function(e){
+				  console.log("ERR:",e);
+			});
+		
+	})
+    .catch(function(e){
+		console.log("ERR:",e);
+		hndVideo.errLocal=true;
+	});
+	
+}
+
 function processICE(req){
 	let client = clients.find(cl=>cl.ip==req.fromIP);
 	if(client){

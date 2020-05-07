@@ -9,8 +9,93 @@ function setWSIP(){
 	wsObj.wsAddress= wsIP;
 	websocketInit({clientType:CLIENT_IS_EVE});
 	document.getElementById("setIP").disabled=true;
+}
+
+function notifyDC(evt,details,dc){
+	switch(evt){
+		case DC_OPEN:
+			//when this opens, we need to start processing video
+			//upgradeToVideo(details);
+			break;
+		case DC_CLOSE:
+		
+			break;
+		case DC_MSG:
+			console.log("DBG: notifyDC>",DC_MSG,"of length",details.data.length);
+			let parse=isActionMsg(details);
+			if(parse){
+				upgradeToVideo(parse,dc);
+			}
+			break;
+	}
+}	
+
+function upgradeToVideo(action,dc){
+	console.log("TBD: processUpgrade",action);
+	let videoPC = new RTCPeerConnection();
+	var desc = new RTCSessionDescription(action.data.response.sdp);
+	
+	videoPC.setRemoteDescription(desc)
+		.then(function() {
+			return videoPC.createAnswer();
+		})
+		.then(function(answer) {
+			return videoPC.setLocalDescription(answer);
+		})
+		.then(function() {
+			console.log("INFO: Sending video accept offer");
+			dc.send(JSON.stringify({action:ACTION_WR_VID_INIT,
+									data:{
+										response:{
+											type: "video-accept-offer",
+											sdp: videoPC.localDescription
+										}
+									}
+					}));
+		})
+		.catch(function(e){
+			console.log("ERR:upgradeToVideo>failed",e);
+		});
+	/*
+	  var localStream = null;
+
+  targetUsername = msg.name;
+  createPeerConnection();
+
+  var desc = new RTCSessionDescription(msg.sdp);
+
+  myPeerConnection.setRemoteDescription(desc).then(function () {
+    return navigator.mediaDevices.getUserMedia(mediaConstraints);
+  })
+  .then(function(stream) {
+    localStream = stream;
+    document.getElementById("local_video").srcObject = localStream;
+
+    localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+  })
+  .then(function() {
+    return myPeerConnection.createAnswer();
+  })
+  .then(function(answer) {
+    return myPeerConnection.setLocalDescription(answer);
+  })
+  .then(function() {
+    var msg = {
+      name: myUsername,
+      target: targetUsername,
+      type: "video-answer",
+      sdp: myPeerConnection.localDescription
+    };
+
+    sendToServer(msg);
+  })
+  .catch(handleGetUserMediaError);
+	*/
 	
 }
+
+
+
 
 function processClientSet(){
 	console.log("TBD: processClientSet");	
@@ -55,24 +140,7 @@ function processICE(msg){
 }
 //let clients=[];
 
-/*function processRequest(req){
-	 //{request:{action:INIT_CONNECTION, fromIP:null, reqId:<hash>}}
-	let action=getAction(req.action);
-	if(typeof(req.fromIP)==="undefined"||!isValidIP(req.fromIP)){
-		wsSend({response:{"status":OFFER_REJECTED,reason:IP_NOT_ON_WHITELIST, forIP:"undefined", reqId:req.reqId}};
-		return;
-	}
-	
-	switch(action){
-		case ACTION_INIT_CONNECTION:
-			buildConnection(req);
-			break;
-		default:
-			console.log("TBD: processRequest",action);
-		
-	}
-	
-}*/
+
 
 function getAction(act){
 	if(typeof(act)==="undefined") return ACTION_UNDEF;
@@ -96,17 +164,6 @@ function isValidIP(ip){
 	return true; //we don't check for last mask of being between 0-255, leaving it as TBD
 }
 
-function buildConnection(req){
-	let obj = {fromIP:req.fromIP,chName:"dc-"+req.fromIP+"-"+req.reqId, callerPC:null, callerDC:null, ice:{candidates: [],exchanged:[]}};
-	let client=clients.filter(c=>c.ip==req.fromIP);
-	if(client.length==0){
-		client.push({ip:req.fromIP,connObjs:[obj]});
-	}
-	else{
-		client.connObjs.push([obj]);
-	}
-	createOffer(obj);
-}
 
 function sendToServer(content){
 	//{response:{status:SDP_OFFER,offer:SDPOfferString, forIP:<ip>}}

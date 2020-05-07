@@ -85,15 +85,17 @@ function finalizeSession(callerObj){
 function createOutboundDC(name, pc) { //we create this as an outbound only channel
 	var dc = pc.createDataChannel(name+"-out");
 	dc.onmessage = 	function(event) {//since it is outbound, we don't care much about inbound data
-						console.log(name + ":received: " + event.data);
+						notifyDC(DC_MSG,event,name);
 					}; //this needs more processing if it is a bidirectional data channel.
 	dc.onopen = 	function() {//once it is opened, some other actions needed here
 						//one of these is to tell the view to reflect the status
 						triggerDOMUpdate(WREVENT,{id:name, innerHTML:name+" "+dc.readyState+" at: "+Date.now()} );
+						notifyDC(DC_OPEN,dc);
 					};
 	dc.onclose = 	function() {//once it is closed, some other actions needed here
 						//one of these is to tell the view to reflect the status
 						triggerDOMUpdate(WREVENT,{id:name,innerHTML:name+" "+dc.readyState+" at: "+Date.now()});
+						notifyDC(DC_CLOSE,dc);
 					};
 	return dc;
 }
@@ -112,13 +114,14 @@ function exchangeICE(iceObj,name){//whenever exchanges occurs, you move the exch
 	console.log("TBD: exchangeICE>",iceObj,name,iceObj.ip);
 	if(typeof(iceObj.ice.exchanged)==="undefined") iceObj.ice.exchanged=[];
 	iceObj.ice.exchanged=iceObj.ice.exchanged.concat(iceObj.ice.candidates.splice(0,iceObj.ice.candidates.length));
-	sendToServer({
-				state: WR_ICE_EXCHG,
-				name: iceObj.chName,
-				forIP: iceObj.ip,
-				ice: iceObj.ice.exchanged.slice(0,iceObj.ice.exchanged.length)
-			});
-	
+	if(iceObj.ice.exchanged.length>1||iceObj.ice.exchanged[0]!=null){
+		sendToServer({
+					state: WR_ICE_EXCHG,
+					name: iceObj.chName,
+					forIP: iceObj.ip,
+					ice: iceObj.ice.exchanged.slice(0,iceObj.ice.exchanged.length)
+				});
+	}
 }
 
 function setICECandidates(pc,ice){
@@ -145,7 +148,8 @@ function addInboundChannel(event, chName){
 							};
 	//basic dc is processed differently
 	inboundChannel.onmessage = function(event) {
-								triggerDOMUpdate(WREVENT,{id:chName+"-data",innerHTML:event.data});
+								triggerDOMUpdate(WREVENT,{id:chName+"-data",innerHTML:event.data.length});
+								notifyDC(DC_MSG,event,inboundChannel)
 								};
 }
 

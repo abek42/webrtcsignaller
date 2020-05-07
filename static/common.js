@@ -9,6 +9,9 @@ const ACTION_WRCONN_NEXT = "Next step of WR connection";
 const ACTION_WS_CLIENT_SET="Client set";
 const ACTION_WS_FAILED="Action WS failed";
 const ACTION_WR_FAILED="Action WR failed";
+const ACTION_WR_VID_INIT="Action to upgrade to video";
+
+
 const CLIENT_IS_ALICE ="alice";
 const CLIENT_IS_EVE = "eve";
 
@@ -20,7 +23,10 @@ const WR_SDP_ANSWER="SDP Answer";
 const WR_ICE_EXCHG="ICE Exchange";
 const WSEVENT = "wsEvent";
 const WREVENT = "wrEvent";
-
+const WRDCOPENEVENT= "wr DC channel open";
+const DC_OPEN="dc open";
+const DC_CLOSE="dc close";
+const DC_MSG ="dc message";
 
 setDOMUpdateListener();
 setDataEvtListener();
@@ -153,7 +159,9 @@ function processMessage(msgObj){
 			Alice sends to Dory {response:{status:OFFER_REJECTED,reason:IP_NOT_ON_WHITELIST, forIP:<ip>, reqId:<hash>}}
 		If valid ip
 			Alice sets Eve's answer as the remote session description using setRemoteDescription().
-
+	**Alice and Eve exchange ICE candidates similarly
+	**Now Alice creates a new RTCPeerConnection object with a media track
+	**Alice shares the connection info over the existing RTCPeerConn>DataChannel
 	
 	*/
 }
@@ -163,4 +171,38 @@ function uuidv4() {//https://stackoverflow.com/questions/105034/how-to-create-gu
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+function isActionMsg(msg){
+	try{
+		let actionMsg=JSON.parse(msg.data);
+		if(actionMsg.action) return actionMsg;
+	}
+	catch(e){
+		console.log("INFO: isActionMsg>parse failed",e);
+		return false;
+	}
+	
+}
+
+//--------------------video stream handler----------------------//
+var mediaConstraints = {
+  audio: true, // We want an audio track
+  video: true // ...and we want a video track
+};
+
+let hndVideo={localStream:null,remoteStream:null,errLocal:false};
+
+function getLocalStream() {
+    navigator.mediaDevices.getUserMedia(mediaConstraints)
+    .then(function(localStream) {
+      document.getElementById("local_video").srcObject = localStream;
+	  hndVideo.localStream=localStream;
+	  hndVideo.errLocal=false;
+     // localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+    })
+    .catch(function(e){
+		console.log("ERR:",e);
+		hndVideo.errLocal=true;
+	});
 }

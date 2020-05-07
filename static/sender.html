@@ -21,6 +21,16 @@
 	Event: <span id="wsEvent"></span>
 	<input type="button" onclick="wsSend('test')" value="Send" id="next">
 </div>
+<div class="flexChild" id="camera-container">
+  <div class="camera-box">
+    <video id="received_video" autoplay></video>
+    <video id="local_video" autoplay muted></video>
+    <button id="hangup-button" onclick="hangUpCall();" disabled>
+      Hang Up
+    </button>
+  </div>
+</div>
+
 <script>
 	console.log("wsinit");
 	websocketInit({clientType:CLIENT_IS_ALICE});

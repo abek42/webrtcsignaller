@@ -1,0 +1,83 @@
+body{font-family:helvetica}
+		.anim1{ animation-name: blip; animation-duration: 0.2s;}
+		.anim2{ animation-name: blip; animation-duration: 0.3s;}
+		@keyframes blip {
+		  0%   {background-color: #113311;}
+		  50%  {background-color: #00dd00;}
+		  100%  {background-color: silver;}
+		}
+		.tile { min-width: 70px;	min-height: 24px;	font-size: small;	font-weight: bold;
+				color: whitesmoke;	border: 1px solid gray;	border-radius: 6px;
+				display: inline-flex;	align-items: center;	justify-content: center;margin:3px;}
+		.tile0 { min-width: 150px;	min-height: 24px;	font-size: small;	font-weight: bold;
+				color: whitesmoke;	border: 1px solid gray;	border-radius: 6px;
+				display: inline-flex;	align-items: center;	justify-content: center;margin:3px;}
+		.tileLong { min-width: 420px; width:725px; min-height: 24px;	font-size: small;	font-weight: bold; 
+				color: whitesmoke;	border: 1px solid gray;	border-radius: 6px; padding-left:10px;
+				display: inline-flex;	align-items: center;	justify-content: left;margin:3px}
+		.gray{background-color:gray;}
+		.green{background-color:green;}
+		.red{background-color:red;}
+		.blue{background-color:deepskyblue;}
+		.silver{background-color:silver;border-color:darkgreen;}
+		
+		.button{border-radius:6px;min-width: 70px;	min-height: 24px;}
+		
+		.dc_name {
+	min-width: 320px;width:490px;
+	display: inline-flex;
+	min-height: 30px;
+	background: lightskyblue;
+	margin: 5px 1px 1px 1px;
+	font-size: small;
+	color: darkblue;
+	align-items: center;
+	padding-left: 5px;
+	border-radius: 6px;
+	font-weight: bold;
+}
+
+#main_websocket_state{
+	border-radius:6px;
+	margin:5px;
+	padding:3px;
+	border:2px solid silver;
+	display:flex;
+	flex-direction:column;
+	max-width:750px;
+}
+.client_status{
+	border-radius:6px;
+	margin:5px;
+	padding:3px;
+	border:2px solid silver;
+	display:flex;
+	flex-direction:column;
+	max-width:750px;
+}
+
+
+.dc_state{
+	display:flex;
+	flex-direction:column;
+	
+}
+
+.client {
+	color: darkblue;
+	width: 500px;
+	display: inline-flex;
+	min-height: 24px;
+	border-radius: 6px;
+	align-content: center;
+	font-weight: bold;
+	font-size: medium;
+	padding-left: 5px;
+	padding-top: 4px;
+}
+
+.states {
+	margin:2px;
+	border-radius:6px;
+	border:1px solid silver;
+}

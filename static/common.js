@@ -182,7 +182,6 @@ function isActionMsg(msg){
 		console.log("INFO: isActionMsg>parse failed",e);
 		return false;
 	}
-	
 }
 
 //--------------------video stream handler----------------------//

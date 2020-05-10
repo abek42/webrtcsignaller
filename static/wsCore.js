@@ -21,6 +21,7 @@ const WS_ACTION_CLOSE_CONN = "ws closing connection";
 const WR_ACTION_FAILED_ERROR="wr requested action failed";
 const WR_ACTION_CONN_NEXT = "Next step of WR connection";
 const WR_ACTION_DC_MSG ="wr data ch process received msg";
+const WR_ACTION_REQ_VIDEO="wr request video";
 
 const ERR_ALICE_UNAVAILABLE="Alice is not connected";
 const ERR_IP_NOT_ON_WHITELIST="IP not on whitelist";
@@ -61,7 +62,7 @@ function websocketInit(config){
 			};
 
 			ws.onmessage = function (msgEvent){ 
-				console.log("DBG: websocketInit>msgEvent");
+				//console.log("DBG: websocketInit>msgEvent");
 				if(msgEvent.data!=null){
 					let msgObj = JSON.parse(msgEvent.data);
 					notifyData(msgObj);
@@ -97,7 +98,7 @@ function websocketInit(config){
 }
 
 function wsSend(msgObj){
-	console.log("DBG: wsSend>",msgObj);
+	//console.log("DBG: wsSend>",msgObj);
 	if(wsConfig.ws.readyState==1){
 		wsConfig.ws.send(JSON.stringify(msgObj));
 	}

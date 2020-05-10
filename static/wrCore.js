@@ -14,6 +14,7 @@ const WR_CH_DATA="wr data channel";
 const WR_SDP_ANSWER="wr peer conn sdp answer";
 const WR_SDP_OFFER ="wr peer conn sdp offer";
 const WR_ICE_EXCHG ="wr peer conn exchange ice";
+const WR_REQ_VIDCH ="wr peer requests video";
 
 function buildConnection(config, signaller,sdp=false){//if sdp is false, we build a connection as initiator
 	//config structure {pc:peerConn,reqId:<uuid>,ice:{newICE:[],exchangedICE:[],exchange:false},channels:[],ip:ip,client:"client<#>_",hndVidCfg:<>};
@@ -25,7 +26,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 	}
 	//ice exchange is default, so set it up
 	peerConn.onicecandidate = function(e) {
-		console.log("DBG: buildConnection>event onICE",e);
+		//console.log("DBG: buildConnection>event onICE",e);
 		config.ice.newICE.push(e.candidate);
 		updateDOM(WR_STATUS,{evt:WR_STATUS_ICE_FOUND,evtData:config.client});
 		if(config.ice.exchange){
@@ -98,7 +99,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 				return peerConn.setLocalDescription(answer);
 			})
 			.then(function() {
-				console.log("DBG: buildConnection>remote SDP path>sending out response")
+				//console.log("DBG: buildConnection>remote SDP path>sending out response")
 				signaller(
 					{
 						wrAction:WR_ACTION_CONN_NEXT,
@@ -141,20 +142,22 @@ function completeConnection(config, sdp,signaller){
 }
 
 function createDC(config,pc) { //we create this as an outbound only channel
-	let dcName = config.reqId+"-dc";
+	let dcName = config.reqId+"-dc-to-"+config.client;
 	let dc = pc.createDataChannel(dcName);
 	config.channels.push({"chHnd":dc,chName:dcName,chType:WR_CH_DATA});
 	dc.onmessage = 	function(event) {//blink UI and then ask notifyData to send it over as a DataEvents
-						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:config.client});
+						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:config.client,srcCh:dcName});
 						notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:config.client,srcCh:dcName}});
 					}; //this needs more processing if it is a bidirectional data channel.
 	dc.onopen = 	function() {//once it is opened, some other actions needed here
 						//one of these is to tell the view to reflect the status
-						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:config.client});
+						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:config.client,srcCh:dcName});
+						console.log("DBG: createDC>onopen>send test msg");
+						dc.send("test msg");
 					};
 	dc.onclose = 	function() {//once it is closed, some other actions needed here
 						//one of these is to tell the view to reflect the status
-						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_CLOSED,evtData:config.client});
+						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_CLOSED,evtData:config.client,srcCh:dcName});
 					};
 	dc.onerror =function(event){
 					console.log("DC ERR: ",event);
@@ -181,7 +184,7 @@ function exchangeICE(iceObj,cfg,signaller){//whenever exchanges occurs, you move
 }
 
 function setICECandidates(pc,ice){
-	console.log("TBD: setICECandidates",pc,ice);
+	//console.log("TBD: setICECandidates",pc,ice);
 	for(let i=0;i<ice.length;i++){
 		if(ice[i]!=null){
 			pc.addIceCandidate(ice[i])
@@ -194,19 +197,26 @@ function setICECandidates(pc,ice){
 
 
 function addInboundChannel(event, cfg){
-	var inboundChannel = event.channel;
+	let inboundChannel = event.channel;
+	let chNameLocal = cfg.reqId+"-from-"+cfg.ip+"_";
+	//index if needed
+	chNameLocal+=cfg.channels.findIndex(ch=>ch.chName==chNameLocal)+1;
 	
+	console.log("INFO: adding inbound DC",cfg.client,event.channel.label,chNameLocal);
 	//irrespective of type, all three have placeholders to show status
 	inboundChannel.onopen  = function(){
-								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:cfg.client});
+								cfg.channels.push({"chHnd":inboundChannel,chName:chNameLocal,chType:WR_CH_DATA});
+								console.log("INFO: inbound DC>onopen>",chNameLocal);
+								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:cfg.client,srcCh:chNameLocal});
 							};
 	inboundChannel.onclose = function(){
-								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_CLOSED,evtData:cfg.client});
+								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_CLOSED,evtData:cfg.client,srcCh:chNameLocal});
 							};
 	//basic dc is processed differently
 	inboundChannel.onmessage = function(event) {
-								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:cfg.client});
-								notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:config.client,srcCh:dcName}})
+								console.log("INFO: inbound DC>onmsg>",chNameLocal,event.data);
+								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:cfg.client,srcCh:chNameLocal});
+								notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:cfg.client,srcCh:chNameLocal}})
 								};
 }
 

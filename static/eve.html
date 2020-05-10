@@ -8,27 +8,7 @@
 	<script src="commonCore.js"></script>
 	<script src="constants.js" ></script>
 	<script src="eve.js" ></script>
-    <style>
-		body{font-family:helvetica}
-		.anim1{ animation-name: blip; animation-duration: 0.2s;}
-		.anim2{ animation-name: blip; animation-duration: 0.3s;}
-		@keyframes blip {
-		  0%   {background-color: #113311;}
-		  50%  {background-color: #00dd00;}
-		  100%  {background-color: silver;}
-		}
-		.tile { min-width: 60px;	min-height: 24px;	font-size: small;	font-weight: bold;
-				color: whitesmoke;	border: 1px solid gray;	border-radius: 6px;
-				display: inline-flex;	align-items: center;	justify-content: center;}
-		.tileLong { min-width: 380px; max-width:380px;	min-height: 24px;	font-size: small;	font-weight: bold; margin-top:5px;
-				color: whitesmoke;	border: 1px solid gray;	border-radius: 6px; padding-left:10px;
-				display: inline-flex;	align-items: center;	justify-content: left;}
-		.gray{background-color:gray;}
-		.green{background-color:green;}
-		.red{background-color:red;}
-		.silver{background-color:silver;border-color:darkgreen;}
-		
-	</style>
+    <link rel="stylesheet" type="text/css" href="common.css">
 </head>
 <body onload="setDebugDiv();">
 <div id="debug">
@@ -36,31 +16,55 @@
 	<span id="reload">ERROR</span><br>
 	Status: <span id="wsStatus"></span><br>
 	Event: <span id="wsEvent"></span>
-	<input type="button" onclick="wsSend('test')" value="Send" id="next">
+	<!--input type="button" onclick="wsSend('test')" value="Send" id="next"-->
 </div>
 <div class="flexChild" id="camera-container">
 	<video id="local_video" autoplay muted></video>
 	<div class="main_websocket">
-		<input type="button" value="Start" id="setIP" onclick="setWSIP();"/><br>
-		<span id="main_websocket_hasWS" class="tile gray">WS</span>
-		<span id="main_websocket_initWS" class="tile gray">Init</span>
-		<span id="main_websocket_openWS" class="tile gray">Open</span>
-		<span id="main_websocket_msgWS" class="tile gray">Msg [0]</span>
-		<span id="main_websocket_closeWS" class="tile gray">Closed</span>
-		<span id="main_websocket_errWS" class="tile gray">Error</span><br>
-		<span id="main_websocket_errmsgWS" class="tileLong gray"></span>
+		<input type="button" value="Start" id="setIP" class="button" onclick="setWSIP();"/><br>
+		<div id="main_websocket_state">adsfdsafd
+			<div class="states">
+				<span id="main_websocket_hasWS" class="tile gray">WS</span>
+				<span id="main_websocket_initWS" class="tile gray">Init</span>
+				<span id="main_websocket_openWS" class="tile gray">Open</span>
+				<span id="main_websocket_msgWS" class="tile gray">Msg [0]</span>
+				<span id="main_websocket_closeWS" class="tile gray">Closed</span>
+				<span id="main_websocket_errWS" class="tile gray">Error</span>
+			</div>
+			<div class="states">
+				<span id="main_websocket_errmsgWS" class="tileLong silver">WS Error: None</span>
+			</div>
+		</div>
 	</div>
-	<div class="client_notifier" id="client0">
+	<div class="client_status" id="client0">
 		<div class="client_wr">
-		<span id="client0" class="tile blue">Client 0</span><br>
-		<span id="client0_wr_init" class="tile gray">WR</span>
-		<span id="client0_wr_pc" class="tile gray">PC</span>
-		<span id="client0_wr_ice_found" class="tile gray">ICE</span>
-		<span id="client0_wr_ice_exchg" class="tile gray">Exch</span>
-		<span id="client0_wr_sdp_local" class="tile gray">SDP-Alice</span>
-		<span id="client0_wr_sdp_remote" class="tile gray">SDP-Eve</span>
-		<span id="client0_wr_dc" class="tile gray">DC</span>
-		<span id="client0_wr_dcmsg" class="tile gray">DC Msg [0]</span>
+			<span id="client0" class="client blue">Client 0</span>
+			<div id="client0_wr_pc_state" class="pc_state states">
+				<span id="client0_wr_init" class="tile gray">WR</span>
+				<span id="client0_wr_pc" class="tile gray">PC</span>
+				<span id="client0_wr_ice_found" class="tile gray">ICE</span>
+				<span id="client0_wr_ice_exchg" class="tile gray">Exch</span>
+				<span id="client0_wr_sdp_local" class="tile gray">SDP-Alice</span>
+				<span id="client0_wr_sdp_remote" class="tile gray">SDP-Eve</span>
+			</div>
+			<div id="dc_state_client0_dc0" class="dc_state states">
+				<div>
+					<span id="dc_name_client0_dc0" class="dc_name">DC Channel Unnamed</span>
+				</div>
+				<div>
+					<span id="dc_chstate_client0_dc0" class="tile0 gray">DC Pending</span>
+					<span id="dc_msg_client0_dc0" class="tile0 gray">DC In/Out Msg [0]</span>
+				</div>
+			</div>
+			<div id="dc_state_client0_dc1" class="dc_state states">
+				<div>
+					<span id="dc_name_client0_dc1" class="dc_name">DC Channel Unnamed</span><br>
+				</div>
+				<div>
+					<span id="dc_chstate_client0_dc1" class="tile0 gray">DC Pending</span>
+					<span id="dc_msg_client0_dc1" class="tile0 gray">DC In/Out Msg [0]</span>
+				</div>
+			</div>
 		</div>
 		<video id="client0_received_video" autoplay></video>
 	</div>

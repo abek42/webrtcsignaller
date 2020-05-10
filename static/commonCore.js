@@ -1,3 +1,4 @@
+const WR_DC_CH_NOT_FOUND="data channel not found in saved cfg";
 
 setDOMUpdateListener();
 setDataEvtListener();
@@ -86,14 +87,18 @@ client0_wr_init" class="tile gray">WR</span>
 			animLabel(hnd);		
 			break;
 		case WR_STATUS_DC_OPEN:
-			hnd+="wr_dc";
+			let chSuffix = getDCSuffix(details.srcCh); //need it again for name label
+			hnd="dc_chstate_"+chSuffix;
+			document.getElementById(hnd).innerHTML="DC Open";
+			document.getElementById("dc_name_"+chSuffix).innerHTML=details.srcCh;
 			break;
 		case WR_STATUS_DC_CLOSED:
-			hnd+="wr_dc";
+			hnd="dc_chstate_"+getDCSuffix(details.srcCh);//just need it once
+			document.getElementById(hnd).innerHTML="DC Closed";
 			grayAlt="red"
 			break;
 		case WR_STATUS_DC_MSG:
-			hnd+="wr_dcmsg";
+			hnd="dc_msg_"+getDCSuffix(details.srcCh);
 			grayAlt="silver";
 			//trigger anim behaviour
 			animLabel(hnd);
@@ -134,7 +139,7 @@ function animLabel(hnd){
 }
 
 function processDataMsg(msgObj){
-	console.log("DBG: processDataMsg>",msgObj);
+	//console.log("DBG: processDataMsg>",msgObj);
 	switch(msgObj.action){
 		case WS_ACTION_SET_CLIENT_TYPE:
 			processClientSet(msgObj.data);
@@ -150,7 +155,7 @@ function processDataMsg(msgObj){
 			processWRConnNext(msgObj);
 			break;
 		default:
-			console.log("TBD: processDataMsg> pending action",msgObj.action);
+			console.log("TBD: processDataMsg> pending action",msgObj.action,msgObj);
 	}
 }
 
@@ -238,7 +243,8 @@ function signallerWRDC(obj,dc){
 							forIP:obj.target,
 							reqId:obj.reqId,
 							sdp:(obj.wrStep==WR_SDP_OFFER||obj.wrStep==WR_SDP_ANSWER)?obj.sdp:"",
-							ice:obj.wrStep==WR_ICE_EXCHG?obj.ice:""
+							ice:obj.wrStep==WR_ICE_EXCHG?obj.ice:"",
+							msg:(obj.wrStep==WR_REQ_VIDCH)?obj.msg:""
 						 }
 				   };
 		dc.send(JSON.stringify(sendObj));	

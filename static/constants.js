@@ -134,28 +134,16 @@ function processMessage(msgObj){
 	
 	
 }*/
-
+/*
 function uuidv4() {//https://stackoverflow.com/questions/105034/how-to-create-guid-uuid
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
-
-function isActionMsg(msg){
-	try{
-		let actionMsg=JSON.parse(msg.data);
-		if(actionMsg.action) return actionMsg;
-	}
-	catch(e){
-		console.log("INFO: isActionMsg>parse failed",e);
-		return false;
-	}
-	
-}
-
+*/
 //--------------------video stream handler----------------------//
-var mediaConstraints = {
+/*var mediaConstraints = {
   audio: true, // We want an audio track
   video: true // ...and we want a video track
 };
@@ -174,4 +162,4 @@ function getLocalStream() {
 		console.log("ERR:",e);
 		hndVideo.errLocal=true;
 	});
-}
+}*/

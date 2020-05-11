@@ -26,13 +26,16 @@ function processDOMUpdate(msg){
 			processWSMsg(msg.details); break;
 		case WR_STATUS:
 			processWRMsg(msg.details); break;
+		case VID_STATUS:
+			processVid(msg.details);
+			break;
 		default:
 			console.log("TBD: processDOMUpdate>",msg.name,msg);
 	}
 }
 
 function processWRMsg(details){
-	console.log("TBD: processWRMsg",details);
+	console.log("INFO: processWRMsg",details);
 	
 	/*
 	onst WR_STATUS_PC="wr pconn created";
@@ -102,6 +105,7 @@ client0_wr_init" class="tile gray">WR</span>
 			grayAlt="silver";
 			//trigger anim behaviour
 			animLabel(hnd);
+			document.getElementById(hnd).innerHTML = "DC In/Out Msg [ "+details.msgLen+" ]";
 			break;
 			
 		/*case WS_STATUS_CLOSE:
@@ -115,13 +119,17 @@ client0_wr_init" class="tile gray">WR</span>
 			grayAlt="gray";
 			break;*/
 		default:
-			console.log("TBD: processWRMsg>",details.evt);
+			console.log("TBD: processWRMsg> unhandled status: ",details.evt,details);
 			return;
 	}
 	domHnd=document.getElementById(hnd);
-	domHnd.classList.remove("gray");
-	if(!domHnd.classList.toString().includes(grayAlt)) domHnd.classList.add(grayAlt);
-	
+	if(domHnd==null){
+		console.log("TBD: processWRMsg>missing DOM>",domHnd,details);
+	}
+	else{
+		domHnd.classList.remove("gray");
+		if(!domHnd.classList.toString().includes(grayAlt)) domHnd.classList.add(grayAlt);
+	}
 }
 
 function animLabel(hnd){
@@ -149,13 +157,39 @@ function processDataMsg(msgObj){
 			processRecovery(msgObj);
 			break;
 		case WS_ACTION_WRCONN_INIT:
-			processWRInitRequest(msgObj);
+			processWRInitRequest(msgObj,signallerWS,{addVideo:false,createDC:true,ignoreIP:false});
 			break;
 		case WR_ACTION_CONN_NEXT:
 			processWRConnNext(msgObj);
 			break;
+		case WR_ACTION_DC_MSG:
+			processDCMsg(msgObj);
+			break;
+		case WR_ACTION_REQ_VIDEO:
+			processVideoWRRequest(msgObj,signallerWRDC,{addVideo:true,createDC:false,ignoreIP:true});
+			break;
 		default:
 			console.log("TBD: processDataMsg> pending action",msgObj.action,msgObj);
+	}
+}
+
+function processDCMsg(msgObj){
+	//console.log("TBD: processDCMsg>",msgObj);
+	if(msgObj.data.msgData==WR_DC_TEST_MSG){
+		console.log("INFO: Test msg from DC channel received successfully");
+		return;
+	}
+	//if not a test msg
+	//console.log("DBG: processDCMsg>msgData",msgObj.data.srcCh,msgObj.data.msgData,isActionMsg({data:msgObj.data.msgData}));
+	let actionMsg=isActionMsg({data:msgObj.data.msgData});
+	if(!actionMsg){
+		console.log("INFO: processDCMsg>DC Msg is not action msg>",msgObj.data.msgData); 
+		return;
+	}
+	else{//don't need to push as event, directly call processDataMsg
+		//console.log("TBD: processDCMsg>processDataMsg>",actionMsg);
+		actionMsg.chHnd=getDCHnd(msgObj.data.srcCh);
+		processDataMsg(actionMsg);
 	}
 }
 
@@ -226,17 +260,25 @@ function processWSMsg(details){
 function signallerWS(obj){
 	let sendObj = {action:obj.wrAction,
 					data:{
-							step:obj.wrStep,
-							forIP:obj.target,
-							reqId:obj.reqId,
+							step:isUndef(obj.wrStep)?"":obj.wrStep,
+							forIP:isUndef(obj.target)?"":obj.target,
+							reqId:isUndef(obj.reqId)?"":obj.reqId,
 							sdp:(obj.wrStep==WR_SDP_OFFER||obj.wrStep==WR_SDP_ANSWER)?obj.sdp:"",
-							ice:obj.wrStep==WR_ICE_EXCHG?obj.ice:""
-						 }
+							ice:obj.wrStep==WR_ICE_EXCHG?obj.ice:"",
+							requestedAction:(obj.wrAction==WR_ACTION_FAILED_ERROR)?obj.reqAct:"",
+							msg:(obj.wrAction==WR_ACTION_FAILED_ERROR)?obj.wrStep:"",
+							error:(obj.wrAction==WR_ACTION_FAILED_ERROR)?obj.err:""
+					 }
 				   };
 	wsSend(sendObj);
 }
 
+function isUndef(obj){
+	if(typeof(obj)==="undefined") return true;
+	return false;
+}
 function signallerWRDC(obj,dc){
+	console.log("DBG: signallerWRDC",obj,dc);
 	let sendObj = {action:obj.wrAction,
 					data:{
 							step:obj.wrStep,
@@ -260,7 +302,7 @@ function uuidv4() {//https://stackoverflow.com/questions/105034/how-to-create-gu
 function isActionMsg(msg){
 	try{
 		let actionMsg=JSON.parse(msg.data);
-		if(actioMsg.action) return actioMsg;
+		if(actionMsg.action) return actionMsg;
 	}
 	catch(e){
 		console.log("INFO: isActionMsg>parse failed",e);

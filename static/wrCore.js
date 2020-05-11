@@ -15,6 +15,7 @@ const WR_SDP_ANSWER="wr peer conn sdp answer";
 const WR_SDP_OFFER ="wr peer conn sdp offer";
 const WR_ICE_EXCHG ="wr peer conn exchange ice";
 const WR_REQ_VIDCH ="wr peer requests video";
+const WR_DC_TEST_MSG="wr dc test msg";
 
 function buildConnection(config, signaller,sdp=false){//if sdp is false, we build a connection as initiator
 	//config structure {pc:peerConn,reqId:<uuid>,ice:{newICE:[],exchangedICE:[],exchange:false},channels:[],ip:ip,client:"client<#>_",hndVidCfg:<>};
@@ -45,7 +46,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 			pNext = new Promise((resolve,reject)=>{
 						navigator.mediaDevices.getUserMedia(vcfg.mediaConstraints)
 							.then(function(localStream) {
-								updateDOM(VID_STATUS,{evt:VID_STREAMING,evtData:localStream});
+								updateDOM(VID_STATUS,{evt:VID_STATUS_STREAM,evtData:localStream});
 								vcfg.localStream=localStream;
 								vcfg.isReady=true;
 								for (const track of localStream.getTracks()) {
@@ -66,6 +67,10 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 			.then(function(offer){
 				updateDOM(WR_STATUS,{evt:WR_STATUS_SDP_LOCAL,evtData:config.client});
 				return peerConn.setLocalDescription(offer);
+			})
+			.then(function() {
+				console.log("INFO: completeConnection>set inboundChannel listener");
+				peerConn.ondatachannel = function(event) {addInboundChannel(event,config);}
 			})
 			.then(function(){
 				console.log("DBG: buildConnection>!sdp branch>sending out offer");
@@ -114,6 +119,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 				exchangeICE(config.ice, config, signaller);
 			})
 			.then(function() {
+				console.log("INFO: buildConnection>set inboundChannel listener");
 				peerConn.ondatachannel = function(event) {addInboundChannel(event,config);}
 			})
 			.catch(function(reason) {
@@ -133,7 +139,6 @@ function completeConnection(config, sdp,signaller){
 			updateDOM(WR_STATUS,{evt:WR_STATUS_SDP_REMOTE,evtData:config.client});
 			config.ice.exchange=true;
 			exchangeICE(config.ice, config,signaller);
-			
 		})
 		.catch(function(reason) {
 			// An error occurred, so handle the failure to connect
@@ -144,16 +149,16 @@ function completeConnection(config, sdp,signaller){
 function createDC(config,pc) { //we create this as an outbound only channel
 	let dcName = config.reqId+"-dc-to-"+config.client;
 	let dc = pc.createDataChannel(dcName);
-	config.channels.push({"chHnd":dc,chName:dcName,chType:WR_CH_DATA});
+	config.channels.push({"chHnd":dc,chName:dcName,chType:WR_CH_DATA,dir:"OUT"});
 	dc.onmessage = 	function(event) {//blink UI and then ask notifyData to send it over as a DataEvents
-						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:config.client,srcCh:dcName});
+						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:config.client,srcCh:dcName,msgLen:event.data.length});
 						notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:config.client,srcCh:dcName}});
 					}; //this needs more processing if it is a bidirectional data channel.
 	dc.onopen = 	function() {//once it is opened, some other actions needed here
 						//one of these is to tell the view to reflect the status
 						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:config.client,srcCh:dcName});
-						console.log("DBG: createDC>onopen>send test msg");
-						dc.send("test msg");
+						console.log("DBG: createDC>onopen>send test msg using",dcName);
+						dc.send(WR_DC_TEST_MSG);
 					};
 	dc.onclose = 	function() {//once it is closed, some other actions needed here
 						//one of these is to tell the view to reflect the status
@@ -202,10 +207,11 @@ function addInboundChannel(event, cfg){
 	//index if needed
 	chNameLocal+=cfg.channels.findIndex(ch=>ch.chName==chNameLocal)+1;
 	
-	console.log("INFO: adding inbound DC",cfg.client,event.channel.label,chNameLocal);
+	console.log("INFO: adding inbound DC",event.channel.label," as ",chNameLocal);
+	cfg.channels.push({"chHnd":inboundChannel,chName:chNameLocal,chType:WR_CH_DATA,dir:"IN"});
 	//irrespective of type, all three have placeholders to show status
 	inboundChannel.onopen  = function(){
-								cfg.channels.push({"chHnd":inboundChannel,chName:chNameLocal,chType:WR_CH_DATA});
+								
 								console.log("INFO: inbound DC>onopen>",chNameLocal);
 								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:cfg.client,srcCh:chNameLocal});
 							};
@@ -215,7 +221,7 @@ function addInboundChannel(event, cfg){
 	//basic dc is processed differently
 	inboundChannel.onmessage = function(event) {
 								console.log("INFO: inbound DC>onmsg>",chNameLocal,event.data);
-								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:cfg.client,srcCh:chNameLocal});
+								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:cfg.client,srcCh:chNameLocal,msgLen:event.data.length});
 								notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:cfg.client,srcCh:chNameLocal}})
 								};
 }

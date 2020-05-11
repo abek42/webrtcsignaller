@@ -13,6 +13,9 @@ const WS_CLIENT_IS_GENERIC = "generic ws client";
 const WS_CLIENT_IS_ALICE = "ws client alice";
 const WS_CLIENT_IS_EVE = "ws client eve";
 
+const VID_STATUS = "video stream status";
+const VID_STATUS_STREAM = "video stream streaming";
+
 const WS_ACTION_SET_CLIENT_TYPE = "ws set client";
 const WS_ACTION_WRCONN_INIT = "ws initiate wr conn";
 const WS_ACTION_FAILED_ERROR="ws requested action failed";

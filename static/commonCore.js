@@ -156,17 +156,20 @@ function processDataMsg(msgObj){
 			processWSMsg({evt:WS_STATUS_ERR,evtData:msgObj.data.error+" : "+msgObj.data.msg,src:"processDataMsg"});//show the error to UI
 			processRecovery(msgObj);
 			break;
-		case WS_ACTION_WRCONN_INIT:
-			processWRInitRequest(msgObj,signallerWS,{addVideo:false,createDC:true,ignoreIP:false});
+		case WS_ACTION_WRCONN_INIT: //recvd request through WS to start new WR-PC
+			processWRInitRequest(msgObj,{isWSReq:true});
 			break;
-		case WR_ACTION_CONN_NEXT:
-			processWRConnNext(msgObj);
+		case WS_ACTION_WRCONN_NEXT:
+			processWRConnNext(msgObj,{isWSReq:true});
+			break;
+		case WR_ACTION_WRCONN_NEXT:
+			processWRConnNext(msgObj,{isWSReq:false,signallerDC:msgObj.chHnd});
 			break;
 		case WR_ACTION_DC_MSG:
 			processDCMsg(msgObj);
 			break;
 		case WR_ACTION_REQ_VIDEO:
-			processVideoWRRequest(msgObj,signallerWRDC,{addVideo:true,createDC:false,ignoreIP:true});
+			processVideoWRRequest(msgObj,{isWSReq:false,signallerDC:msgObj.chHnd,addVideo:true,createDC:false,ignoreIP:true});
 			break;
 		default:
 			console.log("TBD: processDataMsg> pending action",msgObj.action,msgObj);
@@ -188,7 +191,7 @@ function processDCMsg(msgObj){
 	}
 	else{//don't need to push as event, directly call processDataMsg
 		//console.log("TBD: processDCMsg>processDataMsg>",actionMsg);
-		actionMsg.chHnd=getDCHnd(msgObj.data.srcCh);
+		actionMsg.chHnd=msgObj.data.chHnd;
 		processDataMsg(actionMsg);
 	}
 }
@@ -257,6 +260,11 @@ function processWSMsg(details){
 	if(!domHnd.classList.toString().includes(grayAlt)) domHnd.classList.add(grayAlt);	
 }
 
+function isUndef(obj){
+	if(typeof(obj)==="undefined") return true;
+	return false;
+}
+
 function signallerWS(obj){
 	let sendObj = {action:obj.wrAction,
 					data:{
@@ -273,10 +281,6 @@ function signallerWS(obj){
 	wsSend(sendObj);
 }
 
-function isUndef(obj){
-	if(typeof(obj)==="undefined") return true;
-	return false;
-}
 function signallerWRDC(obj,dc){
 	console.log("DBG: signallerWRDC",obj,dc);
 	let sendObj = {action:obj.wrAction,

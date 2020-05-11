@@ -49,10 +49,10 @@ function processVid(vidData){
 	
 }
 
-function processVideoWRRequest(msg,signaller,options){
-	console.log("DBG: processVideoWRRequest>",msg,signaller,options,msg.data.fromIP);
+function processVideoWRRequest(msg,opts){
+	console.log("DBG: processVideoWRRequest>",opts,msg.data.fromIP,msg);
 	let req=msg.data;
-	if(!options.ignoreIP){
+	if(!opts.ignoreIP){
 		if(typeof(req.fromIP)==="undefined"||!isValidIP(req.fromIP)){
 			signaller({wrAction:WR_ACTION_FAILED_ERROR,wrStep:ERR_IP_NOT_ON_WHITELIST,reqAct:msg.action,err:ERR_OFFER_REJECTED,target:req.fromIP});
 			return;
@@ -60,29 +60,34 @@ function processVideoWRRequest(msg,signaller,options){
 	}
 
 //if here, valid ip
+	//find it if it already exists
 	let idx=wrConfig.clients.findIndex(c=>c.ip==req.fromIP);;
-	if(idx==-1){
-		wrConfig.clients.push({ip:req.fromIP,connObjs:[]});
+	if(idx==-1){//not found, maybe new client
+		wrConfig.clients.push({ip:req.fromIP,connObjs:[]});//create new client
 		idx = wrConfig.clients.length-1;
 	}
-	let client=wrConfig.clients[idx];
+	let client=wrConfig.clients[idx];//get handle to new client
 	
+	//create the PeerConn config object for new client and push it to list of connObjs the client has
 	let connCfg={pc:null,reqId:req.reqId,
 				 ice:{
 						newICE:[],exchangedICE:[],exchange:false
 					 },
-				 channels:[],ip:req.fromIP,client:"client"+idx+"_",
-				 hndVidCfg:vidConfig,
-				 addVideo:isUndef(options)?false:options.addVideo,
-				 createDC:isUndef(options)?true:options.createDC,
-				 dcComm:msg.chHnd
+				 channels:[],ip:req.fromIP,client:"client"+idx+"_"
 				};
 	client.connObjs.push(connCfg);//save it for later
-	buildConnection(connCfg,signaller,false);	
+	let options = {	nextAction:opts.isWSReq?WS_ACTION_WRCONN_NEXT:WR_ACTION_WRCONN_NEXT,
+					signaller:opts.isWSReq?signallerWS:signallerWRDC,
+					signallerDC:isUndef(opts.signallerDC)?"":opts.signallerDC,
+					sdp:isUndef(opts.sdp)?false:opts.sdp,
+					createDC:opts.isWSReq?true:true,
+					addVideo:isUndef(opts.addVideo)?false:opts.addVideo,
+					hndVidCfg:vidConfig}
+	buildConnection(connCfg,options);	
 	
 }
 
-function processWRInitRequest(msg,signaller,options){
+function processWRInitRequest(msg,opts){
 /*
 	Alice checks if request fromIP is a valid IP, 
 		If not
@@ -94,10 +99,14 @@ function processWRInitRequest(msg,signaller,options){
 			Alice stringifies the offer 
 			Alice sends stringified offer to Dory {response:{status:SDP_OFFER,offer:SDPOfferString, forIP:<ip>}}
 */
-	console.log("DBG: processWRInitRequest>",msg,signaller,options,msg.data.fromIP);
+	console.log("DBG: processWRInitRequest>",msg);
+	
 	let req=msg.data;
-	if(!options.ignoreIP){
+	
+	
+	if(opts.isWSReq){//if from websocket, always check ip
 		if(typeof(req.fromIP)==="undefined"||!isValidIP(req.fromIP)){
+			//this is a WS caller, so signalling is definitely through WS
 			signaller({wrAction:WR_ACTION_FAILED_ERROR,wrStep:ERR_IP_NOT_ON_WHITELIST,reqAct:msg.action,err:ERR_OFFER_REJECTED,target:req.fromIP});
 			return;
 		}
@@ -115,26 +124,45 @@ function processWRInitRequest(msg,signaller,options){
 				 ice:{
 						newICE:[],exchangedICE:[],exchange:false
 					 },
-				 channels:[],ip:req.fromIP,client:"client"+idx+"_",
-				 hndVidCfg:vidConfig,
-				 addVideo:isUndef(options)?false:options.addVideo,
-				 createDC:isUndef(options)?true:options.createDC,
-				 dcComm:msg.chHnd
+				 channels:[],ip:req.fromIP,client:"client"+idx+"_"
 				};
 	client.connObjs.push(connCfg);//save it for later
-	buildConnection(connCfg,signaller,false);
+	let options = {	nextAction:opts.isWSReq?WS_ACTION_WRCONN_NEXT:WR_ACTION_WRCONN_NEXT,
+					signaller:opts.isWSReq?signallerWS:signallerWRDC,
+					signallerDC:isUndef(opts.signallerDC)?"":opts.signallerDC,
+					sdp:isUndef(opts.sdp)?false:opts.sdp,
+					createDC:opts.isWSReq?true:true,
+					addVideo:isUndef(opts.addVideo)?false:opts.addVideo,
+					hndVidCfg:vidConfig}
+	buildConnection(connCfg,options);
 	
 }
 
-function processWRConnNext(msgObj){
+function processWRConnNext(msgObj,opts){
+	//next step in negotiation of WR-PC
+	//first find the config obj containing the PC
+	console.log("DBG: processWRConnNext>",msgObj);
+	let cfg="";
+	let options={sdp:msgObj.data.sdp,signaller:signallerWS,signallerDC:null,nextAction:WS_ACTION_WRCONN_NEXT};
+	if(opts.isWSReq){
+		cfg = wrConfig.clients.find(cl=>cl.ip==msgObj.data.fromIP)
+						.connObjs.find(co=>co.reqId==msgObj.data.reqId);				
+	}
+	else{
+		cfg = wrConfig.clients.find(cl=>cl.ip==msgObj.data.fromIP)
+						.connObjs.find(co=>co.reqId==msgObj.data.reqId);				
+		options.signaller=signallerWRDC;
+		options.signallerDC=opts.signallerDC;
+		options.nextAction=WR_ACTION_WRCONN_NEXT;
+		console.log("TBD: processWRConnNext>non-WS router",msgObj,opts,options);
+		
+	}
 	switch(msgObj.data.step){
 		case WR_SDP_ANSWER:
-			let cfg = wrConfig.clients.find(cl=>cl.ip==msgObj.data.fromIP).connObjs.find(co=>co.reqId==msgObj.data.reqId);
-			completeConnection(cfg,msgObj.data.sdp,signallerWS);
+			completeConnection(cfg,options);
 			break;
 		case WR_ICE_EXCHG:
-			let cfgICE = wrConfig.clients.find(cl=>cl.ip==msgObj.data.fromIP).connObjs.find(co=>co.reqId==msgObj.data.reqId);
-			setICECandidates(cfgICE.pc,msgObj.data.ice);
+			setICECandidates(cfg.pc,msgObj.data.ice);
 			break;
 		default:
 			console.log("TBD: processWRConnNext>pending",msgObj.data.step,msgObj.data);

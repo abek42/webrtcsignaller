@@ -15,16 +15,19 @@ const WS_CLIENT_IS_EVE = "ws client eve";
 
 const VID_STATUS = "video stream status";
 const VID_STATUS_STREAM = "video stream streaming";
+const VID_STATUS_STREAM_REMOTE = "remote video stream on";
 
 const WS_ACTION_SET_CLIENT_TYPE = "ws set client";
 const WS_ACTION_WRCONN_INIT = "ws initiate wr conn";
+const WS_ACTION_WRCONN_NEXT = "ws mediated next step of WR connection";
 const WS_ACTION_FAILED_ERROR="ws requested action failed";
 const WS_ACTION_CLOSE_CONN = "ws closing connection";
 
 const WR_ACTION_FAILED_ERROR="wr requested action failed";
-const WR_ACTION_CONN_NEXT = "Next step of WR connection";
+
 const WR_ACTION_DC_MSG ="wr data ch process received msg";
 const WR_ACTION_REQ_VIDEO="wr request video";
+const WR_ACTION_WRCONN_NEXT = "wrDC mediated next step of new WR connection";
 
 const ERR_ALICE_UNAVAILABLE="Alice is not connected";
 const ERR_IP_NOT_ON_WHITELIST="IP not on whitelist";

@@ -16,6 +16,7 @@ const WS_CLIENT_IS_EVE = "ws client eve";
 const WS_ACTION_SET_CLIENT_TYPE="ws set client";
 const WS_ACTION_CLOSE_CONN="ws closing connection";
 const WS_ACTION_WRCONN_INIT = "ws initiate wr conn";
+const WS_ACTION_WRCONN_NEXT = "ws mediated next step of WR connection";
 const WS_ACTION_FAILED_ERROR="ws requested action failed";
 const WR_ACTION_CONN_NEXT = "Next step of WR connection";
 
@@ -106,7 +107,7 @@ function process(msg,client){
 				setClientType(obj.data.type,client);
 				break;
 			case WS_ACTION_WRCONN_INIT:
-			case WR_ACTION_CONN_NEXT:
+			case WS_ACTION_WRCONN_NEXT:
 				processWRSignals(obj.action,obj.data,client);
 				break;
 			// WS_A
@@ -119,6 +120,7 @@ function process(msg,client){
 				break;*/
 			default:
 				console.log("TBD: process>Unknown action", obj.action,msg);
+				sendErrMsg(client.connection,"Unsupported action:"+obj.action,msg)
 			
 		}
 	}
@@ -154,7 +156,7 @@ function processWRSignals(action,signal,client){
 		}
 		return;
 	}
-	if(action==WR_ACTION_CONN_NEXT){
+	if(action==WS_ACTION_WRCONN_NEXT){
 		console.log("DBG: processWRNext",client.ip,client.type);
 		if(client.type==WS_CLIENT_IS_ALICE){
 			let eve = wsStatus.browserClients.find(bc=>bc.type==WS_CLIENT_IS_EVE&&bc.ip==signal.forIP);
@@ -167,7 +169,9 @@ function processWRSignals(action,signal,client){
 			signal.fromIP=client.ip;
 			sendMsg(alice.connection,action,signal);
 		}
+		return;
 	}
+	sendErrMsg(client.connection,"Unsupported action:"+obj.action,msg)
 	
 }
 function processWRNext(obj,client){
@@ -211,7 +215,7 @@ function setClientType(type,client){
 		if(allowClient(type)){
 			client.type=type;
 			//console.log("DBG: setClientType","set",client.type);
-			sendMsg(client.connection,WS_ACTION_SET_CLIENT_TYPE,{"state":"set",to:client.type});
+			sendMsg(client.connection,WS_ACTION_SET_CLIENT_TYPE,{"state":"set",to:client.type,ip:client.ip});
 		}
 		else{
 			console.log("DBG: disallowed",type);

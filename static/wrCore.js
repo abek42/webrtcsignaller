@@ -17,28 +17,37 @@ const WR_ICE_EXCHG ="wr peer conn exchange ice";
 const WR_REQ_VIDCH ="wr peer requests video";
 const WR_DC_TEST_MSG="wr dc test msg";
 
-function buildConnection(config, signaller,sdp=false){//if sdp is false, we build a connection as initiator
+function buildConnection(config, options){//options structure is {signaller:<fn>,signallerDC:<dc if signallerwrdc>,sdp:<false|sdp>,addVideo:<true|false>,createDC:<true|false>,hndVidCfg:<handle to videoCfg obj>}
 	//config structure {pc:peerConn,reqId:<uuid>,ice:{newICE:[],exchangedICE:[],exchange:false},channels:[],ip:ip,client:"client<#>_",hndVidCfg:<>};
 	updateDOM(WR_STATUS,{evt:WR_STATUS_WR_INIT,evtData:config.client});
+	
 	let peerConn = new RTCPeerConnection();
 	updateDOM(WR_STATUS,{evt:WR_STATUS_PC,evtData:config.client});
-	if(config.createDC){
+	
+	if(options.createDC){//normally, this is essential for PeerConn to complete all init steps
 		createDC(config,peerConn);
 	}
+	
 	//ice exchange is default, so set it up
 	peerConn.onicecandidate = function(e) {
 		//console.log("DBG: buildConnection>event onICE",e);
 		config.ice.newICE.push(e.candidate);
 		updateDOM(WR_STATUS,{evt:WR_STATUS_ICE_FOUND,evtData:config.client});
 		if(config.ice.exchange){
-			exchangeICE(config.ice, config, signaller);
+			exchangeICE(config.ice, config, {signaller:options.signaller,signallerDC:options.signallerDC,nextAction:options.nextAction});
 		}
+	}
+	
+	peerConn.ontrack = function(e){
+		console.log("TBD: buildConnection>onTrack>",config,e);
+		if(!config.inboundStream){	config.inboundStream=new MediaStream();}
+		updateDOM(VID_STATUS,{evt:VID_STATUS_STREAM_REMOTE,evtData:{rtcTrkEvt:e,ibs:config.inboundStream}});
 	}
 	
 	//check if video tracks are available to add
 	let pNext;
-	if(config.addVideo&&config.hndVidCfg){//we have the handle to the video obj and we want to add it
-		let vcfg=config.hndVidCfg;
+	if(options.addVideo&&options.hndVidCfg){//we have the handle to the video obj and we want to add it
+		let vcfg=options.hndVidCfg;
 		if(vcfg.isReady){//in this case the local stream is ready
 			pNext = new Promise((resolve,reject)=>{resolve("ready already")});
 		}
@@ -52,7 +61,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 								for (const track of localStream.getTracks()) {
 									peerConn.addTrack(track);
 								}//add tracks from localStream to peerConn
-								return("done");
+								resolve("done");
 							});
 						});
 		}		
@@ -61,7 +70,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 		pNext = new Promise((resolve,reject)=>{resolve("ready already")});
 	}
 	
-	if(!sdp){//we weren't given an sdp
+	if(!options.sdp){//we weren't given an sdp
 		pNext.then(()=>{
 			peerConn.createOffer()	//returns a promise which resolves into an offer as a RTCSessionDescription
 			.then(function(offer){
@@ -74,14 +83,14 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 			})
 			.then(function(){
 				console.log("DBG: buildConnection>!sdp branch>sending out offer");
-				signaller(
+				options.signaller(
 					{
-						wrAction:WR_ACTION_CONN_NEXT,
+						wrAction:options.nextAction,
 						wrStep:WR_SDP_OFFER,
 						target:config.ip,
 						sdp:peerConn.localDescription,
 						reqId:config.reqId,
-					},config.dcComm
+					},options.signallerDC
 				);
 				config.pc=peerConn;//save reference to it
 			})
@@ -91,7 +100,7 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 		});		
 	}
 	else{//sdp was provided, so this is the other end of the connection
-		let remoteSDP = new RTCSessionDescription(sdp);
+		let remoteSDP = new RTCSessionDescription(options.sdp);
 		
 		pNext.then(()=>{
 			peerConn.setRemoteDescription(remoteSDP)
@@ -105,18 +114,18 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 			})
 			.then(function() {
 				//console.log("DBG: buildConnection>remote SDP path>sending out response")
-				signaller(
+				options.signaller(
 					{
-						wrAction:WR_ACTION_CONN_NEXT,
+						wrAction:options.nextAction,
 						wrStep:WR_SDP_ANSWER,
 						target: config.ip,
 						sdp: peerConn.localDescription,
 						reqId:config.reqId
-					},config.dcComm
+					},options.signallerDC
 				);
 				config.pc=peerConn;
 				config.ice.exchange=true;
-				exchangeICE(config.ice, config, signaller);
+				exchangeICE(config.ice, config, {signaller:options.signaller,signallerDC:options.signallerDC,nextAction:options.nextAction});
 			})
 			.then(function() {
 				console.log("INFO: buildConnection>set inboundChannel listener");
@@ -126,19 +135,17 @@ function buildConnection(config, signaller,sdp=false){//if sdp is false, we buil
 				// An error occurred, so handle the failure to connect
 				console.log("ERR: buildConnection>remote sdp branch>",reason);
 			});	
-		});
-		
+		});	
 	}
-	
 }
 
-function completeConnection(config, sdp,signaller){
-	let remoteSDP = new RTCSessionDescription(sdp);
+function completeConnection(config, options){
+	let remoteSDP = new RTCSessionDescription(options.sdp);
 	config.pc.setRemoteDescription(remoteSDP)
 		.then(function() {
 			updateDOM(WR_STATUS,{evt:WR_STATUS_SDP_REMOTE,evtData:config.client});
 			config.ice.exchange=true;
-			exchangeICE(config.ice, config,signaller);
+			exchangeICE(config.ice, config, {signaller:options.signaller,signallerDC:options.signallerDC,nextAction:options.nextAction});
 		})
 		.catch(function(reason) {
 			// An error occurred, so handle the failure to connect
@@ -151,13 +158,14 @@ function createDC(config,pc) { //we create this as an outbound only channel
 	let dc = pc.createDataChannel(dcName);
 	config.channels.push({"chHnd":dc,chName:dcName,chType:WR_CH_DATA,dir:"OUT"});
 	dc.onmessage = 	function(event) {//blink UI and then ask notifyData to send it over as a DataEvents
+						console.log("INFO: createDC> on msg>ch:",dcName,"len: ",event.data.length);
 						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:config.client,srcCh:dcName,msgLen:event.data.length});
-						notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:config.client,srcCh:dcName}});
+						notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:config.client,srcCh:dcName,chHnd:dc}});
 					}; //this needs more processing if it is a bidirectional data channel.
 	dc.onopen = 	function() {//once it is opened, some other actions needed here
 						//one of these is to tell the view to reflect the status
-						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:config.client,srcCh:dcName});
 						console.log("DBG: createDC>onopen>send test msg using",dcName);
+						updateDOM(WR_STATUS,{evt:WR_STATUS_DC_OPEN,evtData:config.client,srcCh:dcName});
 						dc.send(WR_DC_TEST_MSG);
 					};
 	dc.onclose = 	function() {//once it is closed, some other actions needed here
@@ -170,20 +178,20 @@ function createDC(config,pc) { //we create this as an outbound only channel
 }
 
 
-function exchangeICE(iceObj,cfg,signaller){//whenever exchanges occurs, you move the exchanged ones to another array
+function exchangeICE(iceObj,cfg,signalOpts){//whenever exchanges occurs, you move the exchanged ones to another array
 	if(typeof(iceObj.exchangedICE)==="undefined") iceObj.exchangedICE=[];
 	if(iceObj.newICE.length>1||iceObj.newICE[0]!=null){//for some reason FF adds a null ICE, we don't want to exchange just that one
 		updateDOM(WR_STATUS,{evt:WR_STATUS_ICE_EXCHG,evtData:cfg.client});
 		let toSend = iceObj.newICE.slice(0,iceObj.newICE.length);
 		iceObj.exchangedICE = iceObj.exchangedICE.concat(iceObj.newICE.splice(0,iceObj.newICE.length));
-		signaller(
+		signalOpts.signaller(
 					{
-						wrAction:WR_ACTION_CONN_NEXT,
+						wrAction:signalOpts.nextAction,
 						wrStep:WR_ICE_EXCHG,
 						target: cfg.ip,
 						ice:toSend,
 						reqId:cfg.reqId
-					},cfg.dcComm
+					},signalOpts.signallerDC
 				);
 	}
 }
@@ -220,9 +228,9 @@ function addInboundChannel(event, cfg){
 							};
 	//basic dc is processed differently
 	inboundChannel.onmessage = function(event) {
-								console.log("INFO: inbound DC>onmsg>",chNameLocal,event.data);
+								console.log("INFO: inbound DC>onmsg>",chNameLocal,"len: ",event.data.length);
 								updateDOM(WR_STATUS,{evt:WR_STATUS_DC_MSG,evtData:cfg.client,srcCh:chNameLocal,msgLen:event.data.length});
-								notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:cfg.client,srcCh:chNameLocal}})
+								notifyData({action:WR_ACTION_DC_MSG,data:{msgData:event.data,evtData:cfg.client,srcCh:chNameLocal,chHnd:inboundChannel}})
 								};
 }
 
